@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FileDown, PencilLine, Search, Trash2 } from "lucide-react";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLang, useMessages } from "@/components/language";
 import { inputClassName } from "@/components/ui/form-field";
 import {
@@ -31,62 +31,107 @@ type AlumniRow = {
 
 type SortMode = "newest" | "name";
 
+type ListData = {
+  items: AlumniRow[];
+  total: number;
+  totalPages: number;
+};
+
+type ListView = {
+  search: string;
+  sort: SortMode;
+  page: number;
+};
+
 const PAGE_SIZE = 20;
+
+let savedView: ListView = { search: "", sort: "newest", page: 1 };
+const pageCache = new Map<string, ListData>();
+
+function cacheKey(view: ListView) {
+  return `${view.sort}|${view.page}|${view.search.trim().toLowerCase()}`;
+}
 
 export function AdminUsersTable() {
   const m = useMessages();
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortMode>("newest");
-  const [page, setPage] = useState(1);
-  const [rows, setRows] = useState<AlumniRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const saved = pageCache.get(cacheKey(savedView));
+  const [searchInput, setSearchInput] = useState(savedView.search);
+  const [search, setSearch] = useState(savedView.search);
+  const [sort, setSort] = useState<SortMode>(savedView.sort);
+  const [page, setPage] = useState(savedView.page);
+  const [fetchTick, setFetchTick] = useState(0);
+  const forceFetch = useRef(false);
+  const [rows, setRows] = useState<AlumniRow[]>(saved?.items ?? []);
+  const [total, setTotal] = useState(saved?.total ?? 0);
+  const [totalPages, setTotalPages] = useState(saved?.totalPages ?? 1);
+  const [loading, setLoading] = useState(!saved);
   const [error, setError] = useState<string | null>(null);
 
-  async function load(
-    query = search,
-    sortMode = sort,
-    pageNumber = page,
-  ) {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (query) params.set("search", query);
-      params.set("sort", sortMode);
-      params.set("page", String(pageNumber));
-      params.set("limit", String(PAGE_SIZE));
-      const res = await fetch(`/api/admin/alumni?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? m.loadFailed);
-      setRows(data.items ?? []);
-      setTotal(data.total ?? 0);
-      setTotalPages(
-        Math.max(
-          1,
-          data.totalPages ?? Math.ceil((data.total ?? 0) / PAGE_SIZE) ?? 1,
-        ),
-      );
-      setPage(data.page ?? pageNumber);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : m.loadFailed);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
+    const view: ListView = { search, sort, page };
+    savedView = view;
+    const cached = pageCache.get(cacheKey(view));
+    const force = forceFetch.current;
+    forceFetch.current = false;
+    if (cached && !force) {
+      setRows(cached.items);
+      setTotal(cached.total);
+      setTotalPages(cached.totalPages);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function load() {
+      if (!cached) setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (search) params.set("search", search);
+        params.set("sort", sort);
+        params.set("page", String(page));
+        params.set("limit", String(PAGE_SIZE));
+        const res = await fetch(`/api/admin/alumni?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? m.loadFailed);
+        if (cancelled) return;
+        const next: ListData = {
+          items: data.items ?? [],
+          total: data.total ?? 0,
+          totalPages: Math.max(
+            1,
+            data.totalPages ?? Math.ceil((data.total ?? 0) / PAGE_SIZE) ?? 1,
+          ),
+        };
+        pageCache.set(cacheKey(view), next);
+        setRows(next.items);
+        setTotal(next.total);
+        setTotalPages(next.totalPages);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : m.loadFailed);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
     void load();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [search, sort, page, fetchTick, m.loadFailed]);
 
   async function handleDelete(id: string) {
     if (!confirm(m.confirmDelete)) return;
     const res = await fetch(`/api/admin/alumni/${id}`, { method: "DELETE" });
     if (!res.ok) return;
+    pageCache.clear();
+    forceFetch.current = true;
     const nextPage = rows.length === 1 && page > 1 ? page - 1 : page;
-    setPage(nextPage);
-    void load(search, sort, nextPage);
+    if (nextPage !== page) setPage(nextPage);
+    setFetchTick((tick) => tick + 1);
   }
 
   return (
@@ -108,10 +153,8 @@ export function AdminUsersTable() {
           className={`${inputClassName} sm:w-44`}
           value={sort}
           onChange={(e) => {
-            const value = e.target.value as SortMode;
-            setSort(value);
+            setSort(e.target.value as SortMode);
             setPage(1);
-            void load(search, value, 1);
           }}
         >
           <option value="newest">{m.sortNewest}</option>
@@ -120,16 +163,18 @@ export function AdminUsersTable() {
       </div>
 
       <AdminSearchBar
-        search={search}
-        setSearch={setSearch}
+        search={searchInput}
+        setSearch={setSearchInput}
         onSearch={() => {
+          setSearch(searchInput.trim());
           setPage(1);
-          void load(search, sort, 1);
         }}
       />
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-      {loading ? <p className="text-sm text-muted">{m.loading}</p> : null}
+      {loading && rows.length === 0 ? (
+        <p className="text-sm text-muted">{m.loading}</p>
+      ) : null}
 
       {!loading && rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
@@ -144,7 +189,7 @@ export function AdminUsersTable() {
               <MobileRow
                 key={row._id}
                 row={row}
-                onDelete={() => void handleDelete(row._id)}
+                onDelete={() => handleDelete(row._id)}
               />
             ))}
           </ul>
@@ -156,7 +201,7 @@ export function AdminUsersTable() {
                   <DesktopRow
                     key={row._id}
                     row={row}
-                    onDelete={() => void handleDelete(row._id)}
+                    onDelete={() => handleDelete(row._id)}
                   />
                 ))}
               </tbody>
@@ -169,28 +214,20 @@ export function AdminUsersTable() {
                 type="button"
                 disabled={page <= 1 || loading}
                 className="inline-flex h-9 items-center rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => {
-                  const next = page - 1;
-                  setPage(next);
-                  void load(search, sort, next);
-                }}
+                onClick={() => setPage((p) => p - 1)}
               >
                 {m.previousPage}
               </button>
               <p className="text-sm text-muted">
                 {m.pageOf
-                  .replace("{page}", String(page))
-                  .replace("{total}", String(totalPages))}
+                  .replace('{page}', String(page))
+                  .replace('{total}', String(totalPages))}
               </p>
               <button
                 type="button"
                 disabled={page >= totalPages || loading}
                 className="inline-flex h-9 items-center rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => {
-                  const next = page + 1;
-                  setPage(next);
-                  void load(search, sort, next);
-                }}
+                onClick={() => setPage((p) => p + 1)}
               >
                 {m.nextPage}
               </button>

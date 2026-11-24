@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Alumni">
+  <rect width="32" height="32" rx="8" fill="#0b3d2e"/>
+  <!-- Graduation cap -->
+  <path fill="#f4ead0" d="M16 6.2 4.8 11.2l11.2 5 11.2-5L16 6.2Z"/>
+  <path fill="#b8892e" d="M16 12.2 7.6 8.5v6.2c0 2.4 3.7 4.3 8.4 4.3s8.4-1.9 8.4-4.3V8.5L16 12.2Z"/>
+  <path fill="#d4a94a" d="M25.4 11.4v5.1c0 .5.3.9.8 1.1l.6.2c.4-.2.7-.6.7-1.1v-4.6l-2.1-.7Z"/>
+  <!-- Person -->
+  <circle cx="16" cy="20.2" r="2.4" fill="#f4ead0"/>
+  <path fill="#f4ead0" d="M10.6 27.4c.4-3.2 2.7-5 5.4-5s5 1.8 5.4 5H10.6Z"/>
+</svg>
