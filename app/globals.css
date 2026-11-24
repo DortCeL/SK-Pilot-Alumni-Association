@@ -1,26 +1,108 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef4f0;
+  --foreground: #13261c;
+  --brand: #14624a;
+  --brand-deep: #0b3d2e;
+  --brand-soft: #d5ebe1;
+  --accent: #b8892e;
+  --accent-soft: #f4ead0;
+  --ink: #13261c;
+  --muted: #5a6f64;
+  --paper: #ffffff;
+  --line: #c5d6cc;
+}
+
+.dark {
+  --background: #081611;
+  --foreground: #e6f0ea;
+  --brand: #3d9a78;
+  --brand-deep: #1f6b52;
+  --brand-soft: #14352a;
+  --accent: #d4a94a;
+  --accent-soft: #3a3018;
+  --ink: #e6f0ea;
+  --muted: #9bb0a5;
+  --paper: #0f221a;
+  --line: #244338;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-paper: var(--paper);
+  --color-line: var(--line);
+  --font-sans: var(--font-bangla), var(--font-fraunces), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), var(--font-bangla), Georgia, serif;
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes soft-zoom {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-rise-delay {
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
+}
+
+.animate-rise-delay-2 {
+  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+.animate-hero-image {
+  animation: soft-zoom 14s ease-out both;
+}
+
+.animate-fade {
+  animation: fade-in 1s ease both;
 }
