@@ -6,6 +6,7 @@ import { FileDown, PencilLine, Search, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLang, useMessages } from "@/components/language";
 import { inputClassName } from "@/components/ui/form-field";
+import { Spinner } from "@/components/ui/spinner";
 import {
   displayValue,
   formatAddress,
@@ -65,6 +66,8 @@ export function AdminUsersTable() {
   const [total, setTotal] = useState(saved?.total ?? 0);
   const [totalPages, setTotalPages] = useState(saved?.totalPages ?? 1);
   const [loading, setLoading] = useState(!saved);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -124,14 +127,42 @@ export function AdminUsersTable() {
   }, [search, sort, page, fetchTick, m.loadFailed]);
 
   async function handleDelete(id: string) {
+    if (deletingId) return;
     if (!confirm(m.confirmDelete)) return;
-    const res = await fetch(`/api/admin/alumni/${id}`, { method: "DELETE" });
-    if (!res.ok) return;
-    pageCache.clear();
-    forceFetch.current = true;
-    const nextPage = rows.length === 1 && page > 1 ? page - 1 : page;
-    if (nextPage !== page) setPage(nextPage);
-    setFetchTick((tick) => tick + 1);
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/alumni/${id}`, { method: "DELETE" });
+      if (!res.ok) return;
+      pageCache.clear();
+      forceFetch.current = true;
+      const nextPage = rows.length === 1 && page > 1 ? page - 1 : page;
+      if (nextPage !== page) setPage(nextPage);
+      setLoading(true);
+      setFetchTick((tick) => tick + 1);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function downloadPdf() {
+    if (pdfLoading) return;
+    setPdfLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/alumni/pdf");
+      if (!res.ok) throw new Error(m.loadFailed);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "alumni.pdf";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : m.loadFailed);
+    } finally {
+      setPdfLoading(false);
+    }
   }
 
   return (
@@ -141,19 +172,26 @@ export function AdminUsersTable() {
           <p className="text-sm text-muted">
             {m.totalRegistered}: {total}
           </p>
-          <a
-            href="/api/admin/alumni/pdf"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 text-xs font-medium text-ink hover:bg-brand-soft sm:text-sm"
+          <button
+            type="button"
+            onClick={() => void downloadPdf()}
+            disabled={pdfLoading}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 text-xs font-medium text-ink hover:bg-brand-soft disabled:opacity-60 sm:text-sm"
           >
-            <FileDown className="h-3.5 w-3.5" aria-hidden />
+            {pdfLoading ? <Spinner /> : <FileDown className="h-3.5 w-3.5" aria-hidden />}
             {m.downloadPdf}
-          </a>
+          </button>
         </div>
         <select
           className={`${inputClassName} sm:w-44`}
           value={sort}
           onChange={(e) => {
-            setSort(e.target.value as SortMode);
+            const nextSort = e.target.value as SortMode;
+            if (nextSort === sort && page === 1) return;
+            if (!pageCache.get(cacheKey({ search, sort: nextSort, page: 1 }))) {
+              setLoading(true);
+            }
+            setSort(nextSort);
             setPage(1);
           }}
         >
@@ -165,15 +203,24 @@ export function AdminUsersTable() {
       <AdminSearchBar
         search={searchInput}
         setSearch={setSearchInput}
+        loading={loading}
         onSearch={() => {
-          setSearch(searchInput.trim());
+          const nextSearch = searchInput.trim();
+          if (nextSearch === search && page === 1) return;
+          if (!pageCache.get(cacheKey({ search: nextSearch, sort, page: 1 }))) {
+            setLoading(true);
+          }
+          setSearch(nextSearch);
           setPage(1);
         }}
       />
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
       {loading && rows.length === 0 ? (
-        <p className="text-sm text-muted">{m.loading}</p>
+        <p className="flex items-center justify-center gap-2 py-8 text-sm text-muted">
+          <Spinner className="h-5 w-5" />
+          {m.loading}
+        </p>
       ) : null}
 
       {!loading && rows.length === 0 ? (
@@ -183,13 +230,19 @@ export function AdminUsersTable() {
       ) : null}
 
       {rows.length > 0 ? (
-        <>
+        <div className="relative">
+          {loading ? (
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-background/55">
+              <Spinner className="h-6 w-6 text-brand" />
+            </div>
+          ) : null}
           <ul className="grid gap-2 md:hidden">
             {rows.map((row) => (
               <MobileRow
                 key={row._id}
                 row={row}
-                onDelete={() => handleDelete(row._id)}
+                deleting={deletingId === row._id}
+                onDelete={() => void handleDelete(row._id)}
               />
             ))}
           </ul>
@@ -201,7 +254,8 @@ export function AdminUsersTable() {
                   <DesktopRow
                     key={row._id}
                     row={row}
-                    onDelete={() => handleDelete(row._id)}
+                    deleting={deletingId === row._id}
+                    onDelete={() => void handleDelete(row._id)}
                   />
                 ))}
               </tbody>
@@ -214,8 +268,15 @@ export function AdminUsersTable() {
                 type="button"
                 disabled={page <= 1 || loading}
                 className="inline-flex h-9 items-center rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => {
+                  const next = page - 1;
+                  if (!pageCache.get(cacheKey({ search, sort, page: next }))) {
+                    setLoading(true);
+                  }
+                  setPage(next);
+                }}
               >
+                {loading ? <Spinner className="mr-1.5" /> : null}
                 {m.previousPage}
               </button>
               <p className="text-sm text-muted">
@@ -227,13 +288,20 @@ export function AdminUsersTable() {
                 type="button"
                 disabled={page >= totalPages || loading}
                 className="inline-flex h-9 items-center rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => {
+                  const next = page + 1;
+                  if (!pageCache.get(cacheKey({ search, sort, page: next }))) {
+                    setLoading(true);
+                  }
+                  setPage(next);
+                }}
               >
+                {loading ? <Spinner className="mr-1.5" /> : null}
                 {m.nextPage}
               </button>
             </div>
           ) : null}
-        </>
+        </div>
       ) : null}
     </div>
   );
@@ -253,9 +321,11 @@ function stopRowAction(event: MouseEvent) {
 
 function MobileRow({
   row,
+  deleting,
   onDelete,
 }: {
   row: AlumniRow;
+  deleting: boolean;
   onDelete: () => void;
 }) {
   const m = useMessages();
@@ -275,13 +345,14 @@ function MobileRow({
         <button
           type="button"
           aria-label={m.delete}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950"
+          disabled={deleting}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-700 hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-950"
           onClick={(event) => {
             stopRowAction(event);
             onDelete();
           }}
         >
-          <Trash2 className="h-4 w-4" aria-hidden />
+          {deleting ? <Spinner /> : <Trash2 className="h-4 w-4" aria-hidden />}
         </button>
       </div>
 
@@ -312,9 +383,11 @@ function MobileRow({
 
 function DesktopRow({
   row,
+  deleting,
   onDelete,
 }: {
   row: AlumniRow;
+  deleting: boolean;
   onDelete: () => void;
 }) {
   const m = useMessages();
@@ -369,13 +442,14 @@ function DesktopRow({
             <button
               type="button"
               aria-label={m.delete}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950"
+              disabled={deleting}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-rose-700 hover:bg-rose-50 disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-950"
               onClick={(event) => {
                 stopRowAction(event);
                 onDelete();
               }}
             >
-              <Trash2 className="h-4 w-4" aria-hidden />
+              {deleting ? <Spinner /> : <Trash2 className="h-4 w-4" aria-hidden />}
             </button>
           </div>
         </div>
@@ -434,10 +508,12 @@ function Avatar({
 function AdminSearchBar({
   search,
   setSearch,
+  loading,
   onSearch,
 }: {
   search: string;
   setSearch: (v: string) => void;
+  loading: boolean;
   onSearch: () => void;
 }) {
   const m = useMessages();
@@ -452,9 +528,10 @@ function AdminSearchBar({
       <button
         type="button"
         onClick={onSearch}
-        className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-deep sm:h-auto"
+        disabled={loading}
+        className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-deep disabled:opacity-60 sm:h-auto"
       >
-        <Search className="h-4 w-4" aria-hidden />
+        {loading ? <Spinner /> : <Search className="h-4 w-4" aria-hidden />}
         {m.search}
       </button>
     </div>

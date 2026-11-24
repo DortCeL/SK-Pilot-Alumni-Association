@@ -11,6 +11,7 @@ import {
 import { ACADEMIC_PROGRAM } from "@/lib/constants";
 import { AlumniFormFields } from "@/components/alumni/alumni-form-fields";
 import { useLang, useMessages } from "@/components/language";
+import { Spinner } from "@/components/ui/spinner";
 
 const defaultValues: AlumniRegistrationInput = {
   fullName: "",
@@ -72,7 +73,6 @@ function RegistrationFormBody() {
       router.push("/login?registered=1");
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : m.registerFailed);
-    } finally {
       setSubmitting(false);
     }
   });
@@ -98,8 +98,9 @@ function RegistrationFormBody() {
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand px-6 text-base font-semibold text-white hover:bg-brand-deep disabled:opacity-60 sm:w-auto"
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-6 text-base font-semibold text-white hover:bg-brand-deep disabled:opacity-60 sm:w-auto"
       >
+        {submitting ? <Spinner /> : null}
         {submitting ? m.submittingRegister : m.submitRegister}
       </button>
     </form>

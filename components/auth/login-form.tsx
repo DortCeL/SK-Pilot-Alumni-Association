@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormField, inputClassName } from "@/components/ui/form-field";
+import { Spinner } from "@/components/ui/spinner";
 import { useMessages } from "@/components/language";
 
 type Props = {
@@ -33,7 +34,6 @@ export function LoginForm({ registered }: Props) {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : m.loginFailed);
-    } finally {
       setLoading(false);
     }
   }
@@ -71,8 +71,9 @@ export function LoginForm({ registered }: Props) {
       <button
         type="submit"
         disabled={loading}
-        className="h-11 w-full rounded-xl bg-brand text-sm font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand text-sm font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
       >
+        {loading ? <Spinner /> : null}
         {loading ? m.loggingIn : m.loginButton}
       </button>
     </form>

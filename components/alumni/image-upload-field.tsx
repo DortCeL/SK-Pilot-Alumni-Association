@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import Image from "next/image";
 import { FormField } from "@/components/ui/form-field";
 import { useMessages } from "@/components/language";
+import { Spinner } from "@/components/ui/spinner";
 
 type Props = {
   label: string;
@@ -65,8 +66,9 @@ export function ImageUploadField({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-dashed border-brand/40 bg-brand-soft px-4 text-sm font-medium text-brand-deep hover:brightness-95 disabled:opacity-60 dark:text-brand"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-dashed border-brand/40 bg-brand-soft px-4 text-sm font-medium text-brand-deep hover:brightness-95 disabled:opacity-60 dark:text-brand"
         >
+          {uploading ? <Spinner /> : null}
           {uploading ? m.uploading : valueUrl ? m.changePhoto : m.clickUpload}
         </button>
         {valueUrl ? (

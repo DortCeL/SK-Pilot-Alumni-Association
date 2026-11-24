@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Noto_Sans_Bengali, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { NavigationProgress } from "@/components/navigation-progress";
 import { SiteHeader } from "@/components/site-header";
 import { LanguageProvider } from "@/components/language";
 import { getLang, getMessages } from "@/lib/i18n";
@@ -41,6 +42,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {`(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})();`}
         </Script>
         <LanguageProvider lang={lang}>
+          <NavigationProgress />
           <SiteHeader />
           <div className="flex-1">{children}</div>
         </LanguageProvider>

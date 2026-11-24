@@ -12,6 +12,7 @@ import {
 } from "@/lib/validations/alumni";
 import { AlumniFormFields } from "@/components/alumni/alumni-form-fields";
 import { useLang, useMessages } from "@/components/language";
+import { Spinner } from "@/components/ui/spinner";
 
 type Props = {
   initialValues: AlumniProfileInput;
@@ -66,9 +67,9 @@ function ProfileEditFormBody({
         return;
       }
       setSubmitSuccess(data.message ?? m.saved);
+      setSubmitting(false);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : m.updateFailed);
-    } finally {
       setSubmitting(false);
     }
   });
@@ -108,8 +109,9 @@ function ProfileEditFormBody({
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-brand px-6 text-base font-semibold text-white hover:bg-brand-deep disabled:opacity-60 sm:w-auto"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-6 text-base font-semibold text-white hover:bg-brand-deep disabled:opacity-60 sm:w-auto"
         >
+          {submitting ? <Spinner /> : null}
           {submitting ? m.saving : m.save}
         </button>
       </div>
