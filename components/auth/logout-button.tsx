@@ -31,7 +31,11 @@ export function LogoutButton({
           setLoading(false);
         }
       }}
-      className={`inline-flex h-10 items-center gap-1.5 rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:opacity-60 ${className}`}
+      className={
+        className
+          ? `${className} disabled:opacity-60`
+          : "inline-flex h-10 items-center gap-1.5 rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:opacity-60"
+      }
     >
       {loading ? <Spinner /> : <LogOut className="h-4 w-4" aria-hidden />}
       {showLabel ? <span>{m.logout}</span> : <span className="sr-only">{m.logout}</span>}

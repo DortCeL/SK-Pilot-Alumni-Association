@@ -49,7 +49,11 @@ export function LanguageToggle({ className = "" }: { className?: string }) {
       type="button"
       onClick={toggle}
       disabled={pending}
-      className={`inline-flex h-10 items-center gap-1.5 rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:opacity-60 ${className}`}
+      className={
+        className
+          ? `${className} disabled:opacity-60`
+          : "inline-flex h-10 items-center gap-1.5 rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:opacity-60"
+      }
     >
       {pending ? <Spinner /> : <Languages className="h-4 w-4 shrink-0" aria-hidden />}
       {m.languageSwitch}
