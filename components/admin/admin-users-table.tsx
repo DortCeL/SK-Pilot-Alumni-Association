@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FileDown, PencilLine, Search, Trash2 } from "lucide-react";
+import { PencilLine, Search, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useLang, useMessages } from "@/components/language";
 import { inputClassName } from "@/components/ui/form-field";
@@ -16,6 +16,7 @@ import {
 type AlumniRow = {
   _id: string;
   fullName: string;
+  registrationNumber?: string;
   academicProgram?: string;
   group: string;
   passingYear: string;
@@ -30,7 +31,7 @@ type AlumniRow = {
   address?: ProfileAddress;
 };
 
-type SortMode = "newest" | "name";
+type SortMode = "newest" | "oldest" | "name";
 
 type ListData = {
   items: AlumniRow[];
@@ -40,24 +41,31 @@ type ListData = {
 
 type ListView = {
   search: string;
+  reg: string;
   sort: SortMode;
   page: number;
 };
 
 const PAGE_SIZE = 20;
 
-let savedView: ListView = { search: "", sort: "newest", page: 1 };
+let savedView: ListView = { search: "", reg: "", sort: "newest", page: 1 };
 const pageCache = new Map<string, ListData>();
 
 function cacheKey(view: ListView) {
-  return `${view.sort}|${view.page}|${view.search.trim().toLowerCase()}`;
+  return `${view.sort}|${view.page}|${view.search.trim().toLowerCase()}|${view.reg.trim().toLowerCase()}`;
 }
 
-export function AdminUsersTable() {
+export function AdminUsersTable({
+  onMembersChanged,
+}: {
+  onMembersChanged?: () => void;
+} = {}) {
   const m = useMessages();
   const saved = pageCache.get(cacheKey(savedView));
   const [searchInput, setSearchInput] = useState(savedView.search);
   const [search, setSearch] = useState(savedView.search);
+  const [regInput, setRegInput] = useState(savedView.reg);
+  const [reg, setReg] = useState(savedView.reg);
   const [sort, setSort] = useState<SortMode>(savedView.sort);
   const [page, setPage] = useState(savedView.page);
   const [fetchTick, setFetchTick] = useState(0);
@@ -66,12 +74,26 @@ export function AdminUsersTable() {
   const [total, setTotal] = useState(saved?.total ?? 0);
   const [totalPages, setTotalPages] = useState(saved?.totalPages ?? 1);
   const [loading, setLoading] = useState(!saved);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(
+    Boolean(savedView.search || savedView.reg),
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const view: ListView = { search, sort, page };
+    const timer = window.setTimeout(() => {
+      const nextSearch = searchInput.trim();
+      const nextReg = regInput.trim();
+      if (nextSearch === search && nextReg === reg) return;
+      setPage(1);
+      setSearch(nextSearch);
+      setReg(nextReg);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, regInput, search, reg]);
+
+  useEffect(() => {
+    const view: ListView = { search, reg, sort, page };
     savedView = view;
     const cached = pageCache.get(cacheKey(view));
     const force = forceFetch.current;
@@ -92,6 +114,7 @@ export function AdminUsersTable() {
       try {
         const params = new URLSearchParams();
         if (search) params.set("search", search);
+        if (reg) params.set("reg", reg);
         params.set("sort", sort);
         params.set("page", String(page));
         params.set("limit", String(PAGE_SIZE));
@@ -124,7 +147,7 @@ export function AdminUsersTable() {
     return () => {
       cancelled = true;
     };
-  }, [search, sort, page, fetchTick, m.loadFailed]);
+  }, [search, reg, sort, page, fetchTick, m.loadFailed]);
 
   async function handleDelete(id: string) {
     if (deletingId) return;
@@ -139,81 +162,77 @@ export function AdminUsersTable() {
       if (nextPage !== page) setPage(nextPage);
       setLoading(true);
       setFetchTick((tick) => tick + 1);
+      onMembersChanged?.();
     } finally {
       setDeletingId(null);
     }
   }
 
-  async function downloadPdf() {
-    if (pdfLoading) return;
-    setPdfLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/alumni/pdf");
-      if (!res.ok) throw new Error(m.loadFailed);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "alumni.pdf";
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : m.loadFailed);
-    } finally {
-      setPdfLoading(false);
+  function changeSort(nextSort: SortMode) {
+    if (nextSort === sort && page === 1) return;
+    if (!pageCache.get(cacheKey({ search, reg, sort: nextSort, page: 1 }))) {
+      setLoading(true);
     }
+    setSort(nextSort);
+    setPage(1);
   }
+
+  const isFiltering = Boolean(searchInput.trim() || regInput.trim());
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-muted">
-            {m.totalRegistered}: {total}
-          </p>
-          <button
-            type="button"
-            onClick={() => void downloadPdf()}
-            disabled={pdfLoading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-paper px-2.5 text-xs font-medium text-ink hover:bg-brand-soft disabled:opacity-60 sm:text-sm"
-          >
-            {pdfLoading ? <Spinner /> : <FileDown className="h-3.5 w-3.5" aria-hidden />}
-            {m.downloadPdf}
-          </button>
-        </div>
-        <select
-          className={`${inputClassName} sm:w-44`}
-          value={sort}
-          onChange={(e) => {
-            const nextSort = e.target.value as SortMode;
-            if (nextSort === sort && page === 1) return;
-            if (!pageCache.get(cacheKey({ search, sort: nextSort, page: 1 }))) {
-              setLoading(true);
-            }
-            setSort(nextSort);
-            setPage(1);
-          }}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          aria-expanded={searchOpen}
+          aria-label={searchOpen ? m.closeSearch : m.openSearch}
+          onClick={() => setSearchOpen((open) => !open)}
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+            searchOpen || isFiltering
+              ? "border-brand bg-brand text-white"
+              : "border-line bg-paper text-ink hover:bg-brand-soft"
+          }`}
         >
-          <option value="newest">{m.sortNewest}</option>
-          <option value="name">{m.sortName}</option>
-        </select>
+          {searchOpen ? (
+            <X className="h-4 w-4" aria-hidden />
+          ) : isFiltering ? (
+            <span className="filter-dots" aria-hidden>
+              <span>.</span>
+              <span>.</span>
+              <span>.</span>
+            </span>
+          ) : (
+            <Search className="h-4 w-4" aria-hidden />
+          )}
+        </button>
       </div>
 
-      <AdminSearchBar
-        search={searchInput}
-        setSearch={setSearchInput}
-        loading={loading}
-        onSearch={() => {
-          const nextSearch = searchInput.trim();
-          if (nextSearch === search && page === 1) return;
-          if (!pageCache.get(cacheKey({ search: nextSearch, sort, page: 1 }))) {
-            setLoading(true);
-          }
-          setSearch(nextSearch);
-          setPage(1);
-        }}
-      />
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          searchOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            className={`origin-top pb-1 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              searchOpen
+                ? "translate-y-0 opacity-100"
+                : "-translate-y-1 opacity-0"
+            }`}
+          >
+            <div className="rounded-2xl border border-line bg-paper p-3 sm:p-4">
+              <AdminSearchBar
+                search={searchInput}
+                setSearch={setSearchInput}
+                reg={regInput}
+                setReg={setRegInput}
+                sort={sort}
+                setSort={changeSort}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
       {loading && rows.length === 0 ? (
@@ -270,7 +289,7 @@ export function AdminUsersTable() {
                 className="inline-flex h-9 items-center rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => {
                   const next = page - 1;
-                  if (!pageCache.get(cacheKey({ search, sort, page: next }))) {
+                  if (!pageCache.get(cacheKey({ search, reg, sort, page: next }))) {
                     setLoading(true);
                   }
                   setPage(next);
@@ -290,7 +309,7 @@ export function AdminUsersTable() {
                 className="inline-flex h-9 items-center rounded-lg border border-line bg-paper px-3 text-sm font-medium text-ink hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => {
                   const next = page + 1;
-                  if (!pageCache.get(cacheKey({ search, sort, page: next }))) {
+                  if (!pageCache.get(cacheKey({ search, reg, sort, page: next }))) {
                     setLoading(true);
                   }
                   setPage(next);
@@ -363,6 +382,11 @@ function MobileRow({
         <Avatar name={row.fullName} src={row.profilePhotoUrl} size={40} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink">{row.fullName}</p>
+          {row.registrationNumber ? (
+            <p className="mt-0.5 text-[11px] font-medium tracking-wide text-muted">
+              {row.registrationNumber}
+            </p>
+          ) : null}
           <p className="mt-0.5 break-words text-xs leading-4 text-brand">{roleLine}</p>
           <p className="mt-1.5 text-[11px] text-muted">
             {m.group}: {displayValue(row.group)}
@@ -406,6 +430,11 @@ function DesktopRow({
             <div className="min-w-0 flex-1 py-0.5 pr-20">
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="font-semibold text-ink">{row.fullName}</span>
+                {row.registrationNumber ? (
+                  <span className="text-xs font-medium tracking-wide text-muted">
+                    {row.registrationNumber}
+                  </span>
+                ) : null}
                 <span className="max-w-full break-words text-xs text-brand">
                   {roleLine}
                 </span>
@@ -508,32 +537,42 @@ function Avatar({
 function AdminSearchBar({
   search,
   setSearch,
-  loading,
-  onSearch,
+  reg,
+  setReg,
+  sort,
+  setSort,
 }: {
   search: string;
   setSearch: (v: string) => void;
-  loading: boolean;
-  onSearch: () => void;
+  reg: string;
+  setReg: (v: string) => void;
+  sort: SortMode;
+  setSort: (v: SortMode) => void;
 }) {
   const m = useMessages();
   return (
-    <div className="flex w-full flex-col gap-2 sm:flex-row">
+    <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
       <input
         className={inputClassName}
         placeholder={m.searchPlaceholder}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      <button
-        type="button"
-        onClick={onSearch}
-        disabled={loading}
-        className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 text-sm font-medium text-white hover:bg-brand-deep disabled:opacity-60 sm:h-auto"
+      <input
+        className={`${inputClassName} sm:max-w-xs`}
+        placeholder={m.regSearchPlaceholder}
+        value={reg}
+        onChange={(e) => setReg(e.target.value)}
+      />
+      <select
+        className={`${inputClassName} sm:w-44`}
+        value={sort}
+        onChange={(e) => setSort(e.target.value as SortMode)}
       >
-        {loading ? <Spinner /> : <Search className="h-4 w-4" aria-hidden />}
-        {m.search}
-      </button>
+        <option value="newest">{m.sortNewest}</option>
+        <option value="oldest">{m.sortOldest}</option>
+        <option value="name">{m.sortName}</option>
+      </select>
     </div>
   );
 }

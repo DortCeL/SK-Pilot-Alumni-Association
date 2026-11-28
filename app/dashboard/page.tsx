@@ -12,8 +12,10 @@ export default async function DashboardPage() {
     <main className="mx-auto w-full max-w-4xl px-4 py-10">
       <AlumniProfileCard
         editHref="/dashboard/edit"
+        idCardHref="/api/alumni/id-card"
         profile={{
           fullName: user.fullName,
+          registrationNumber: user.registrationNumber,
           academicProgram: user.academicProgram,
           group: user.group,
           passingYear: user.passingYear,

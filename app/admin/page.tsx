@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Shield } from "lucide-react";
-import { AdminUsersTable } from "@/components/admin/admin-users-table";
+import { AdminPanel } from "@/components/admin/admin-panel";
 import { getMessages } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/session";
 
@@ -23,7 +23,7 @@ export default async function AdminPage() {
           <p className="mt-2 text-sm text-muted">{m.adminIntro}</p>
         </div>
       </div>
-      <AdminUsersTable />
+      <AdminPanel />
     </main>
   );
 }

@@ -29,6 +29,12 @@ const alumniProfileSchema = new Schema(
   {
     role: { type: String, enum: ["user", "admin"], default: "user" },
     passwordHash: { type: String, required: true, select: false },
+    registrationNumber: {
+      type: String,
+      sparse: true,
+      unique: true,
+      index: true,
+    },
     fullName: { type: String, required: true },
     academicProgram: { type: String, required: true, default: "মাধ্যমিক (SSC)" },
     group: { type: String, required: true },

@@ -15,6 +15,7 @@ export async function GET(request: Request) {
 
   const params = new URL(request.url).searchParams;
   const search = params.get("search")?.trim();
+  const reg = params.get("reg")?.trim();
   const sort = params.get("sort") || "newest";
   const page = Math.max(1, Number(params.get("page")) || 1);
   const limit = Math.min(
@@ -34,25 +35,36 @@ export async function GET(request: Request) {
       { passingYear: regex },
     ];
   }
+  if (reg) {
+    filter.registrationNumber = new RegExp(
+      reg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+      "i",
+    );
+  }
 
   const sortMap: Record<string, Record<string, 1 | -1>> = {
     newest: { createdAt: -1 },
+    oldest: { createdAt: 1 },
     name: { fullName: 1 },
   };
 
   await connectDB();
-  const [items, total] = await Promise.all([
+  const [items, total, registeredTotal, paidTotal] = await Promise.all([
     AlumniProfileModel.find(filter)
       .sort(sortMap[sort] ?? sortMap.newest)
       .skip(skip)
       .limit(limit)
       .lean(),
     AlumniProfileModel.countDocuments(filter),
+    AlumniProfileModel.countDocuments({ role: "user" }),
+    AlumniProfileModel.countDocuments({ role: "user", feePaid: true }),
   ]);
 
   return NextResponse.json({
     items,
     total,
+    registeredTotal,
+    paidTotal,
     page,
     limit,
     totalPages: Math.max(1, Math.ceil(total / limit)),

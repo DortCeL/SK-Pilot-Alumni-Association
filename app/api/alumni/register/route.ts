@@ -6,6 +6,7 @@ import {
   alumniRegistrationSchema,
   toStoredProfile,
 } from "@/lib/validations/alumni";
+import { allocateRegistrationNumber } from "@/lib/registration-number";
 import { AlumniProfileModel } from "@/models/alumni-profile";
 
 export async function POST(request: Request) {
@@ -45,9 +46,12 @@ export async function POST(request: Request) {
       }
     }
 
+    const registrationNumber = await allocateRegistrationNumber(profile.passingYear);
+
     await AlumniProfileModel.create({
       ...profile,
       email,
+      registrationNumber,
       feePaid: false,
       role: "user",
       passwordHash: await hashPassword(password),

@@ -48,5 +48,7 @@ export async function connectDB() {
   cached.conn = await cached.promise;
   const { ensureAdmin } = await import("@/lib/seed-admin");
   await ensureAdmin();
+  const { ensureRegistrationNumbers } = await import("@/lib/registration-number");
+  await ensureRegistrationNumbers();
   return cached.conn;
 }

@@ -32,8 +32,10 @@ export default async function AdminUserProfilePage({
       </Link>
       <AlumniProfileCard
         editHref={`/admin/users/${id}/edit`}
+        idCardHref={`/api/admin/alumni/${id}/id-card`}
         profile={{
           fullName: profile.fullName,
+          registrationNumber: profile.registrationNumber,
           academicProgram: profile.academicProgram,
           group: profile.group,
           passingYear: profile.passingYear,

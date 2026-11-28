@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { PencilLine } from "lucide-react";
+import { DownloadIdCardButton } from "@/components/alumni/download-id-card-button";
 import { displayValue, formatAddress, type ProfileAddress } from "@/lib/profile-display";
 import { getLang, getMessages } from "@/lib/i18n";
 import { ACADEMIC_PROGRAM } from "@/lib/constants";
 
 type Profile = {
   fullName: string;
+  registrationNumber?: string | null;
   academicProgram?: string | null;
   group?: string | null;
   passingYear?: string | null;
@@ -25,9 +27,11 @@ type Profile = {
 export async function AlumniProfileCard({
   profile,
   editHref,
+  idCardHref,
 }: {
   profile: Profile;
   editHref?: string;
+  idCardHref?: string;
 }) {
   const m = await getMessages();
   const lang = await getLang();
@@ -46,19 +50,29 @@ export async function AlumniProfileCard({
             <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
               {profile.fullName}
             </h1>
+            {profile.registrationNumber ? (
+              <p className="mt-1.5 text-sm font-medium tracking-wide text-[#f4ead0]">
+                {m.registrationNumber}: {profile.registrationNumber}
+              </p>
+            ) : null}
             <p className="mt-2 text-sm text-white/85">
               {displayValue(profile.group)} · {m.passingYearLine}{" "}
               {displayValue(profile.passingYear)}
             </p>
           </div>
-          {editHref ? (
-            <Link
-              href={editHref}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-brand-deep hover:bg-[#f4ead0] sm:w-auto"
-            >
-              <PencilLine className="h-4 w-4" aria-hidden />
-              {m.editProfile}
-            </Link>
+          {editHref || idCardHref ? (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-stretch">
+              {editHref ? (
+                <Link
+                  href={editHref}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-brand-deep hover:bg-[#f4ead0] sm:w-auto"
+                >
+                  <PencilLine className="h-4 w-4" aria-hidden />
+                  {m.editProfile}
+                </Link>
+              ) : null}
+              {idCardHref ? <DownloadIdCardButton href={idCardHref} /> : null}
+            </div>
           ) : null}
         </div>
       </div>

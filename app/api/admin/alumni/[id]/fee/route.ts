@@ -23,13 +23,24 @@ export async function PATCH(
   await connectDB();
   const profile = await AlumniProfileModel.findByIdAndUpdate(
     id,
-    { feePaid: body.feePaid },
+    { $set: { feePaid: body.feePaid } },
     { new: true },
-  ).lean();
+  )
+    .select("feePaid fullName")
+    .lean();
 
   if (!profile) {
     return NextResponse.json({ error: m.errProfileMissing }, { status: 404 });
   }
 
-  return NextResponse.json({ profile, message: m.errProfileUpdated });
+  // Confirm the stored value matches what was requested.
+  if (profile.feePaid !== body.feePaid) {
+    return NextResponse.json({ error: m.feeUpdateFailed }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    feePaid: profile.feePaid,
+    profile,
+    message: m.errProfileUpdated,
+  });
 }
