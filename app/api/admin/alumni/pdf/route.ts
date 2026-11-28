@@ -59,8 +59,8 @@ export async function GET(request: Request) {
 
   // Strict Mongo filter: feePaid must be boolean true (not missing, string, or 1).
   const filter = paidOnly
-    ? { role: "user", feePaid: { $eq: true } }
-    : { role: "user" };
+    ? ({ role: "user", feePaid: true } as const)
+    : ({ role: "user" } as const);
 
   const raw = await AlumniProfileModel.find(filter)
     .select(
